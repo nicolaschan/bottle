@@ -5,3 +5,4 @@ authors = ["Nicolas Chan <nicolas@nicolaschan.com>"]
 
 [dependencies]
 pancurses = "0.15"
+websocket = "0.20.2"
