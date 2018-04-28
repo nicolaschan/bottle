@@ -1,3 +1,11 @@
+extern crate pancurses;
+
+use pancurses::{initscr, endwin};
+
 fn main() {
-    println!("Hello, world!");
+  let window = initscr();
+  window.printw("Bottle");
+  window.refresh();
+  window.getch();
+  endwin();
 }
