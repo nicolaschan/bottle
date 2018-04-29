@@ -5,13 +5,17 @@ use websocket::receiver::Reader;
 use websocket::WebSocketError;
 use std::net::TcpStream;
 use std::thread;
+use std::sync::mpsc::channel;
+use std::sync::mpsc::Sender;
+
+use chat_window::ChatWindow;
 
 pub struct Socket {
   sender: Writer<TcpStream>
 }
 
 impl Socket {
-  pub fn new() -> Socket {
+  pub fn new(tx: Sender<String>) -> Socket {
     let client = ClientBuilder::new("ws://bottle.dev.nc99.co")
       .unwrap()
       .connect_insecure()
@@ -20,7 +24,13 @@ impl Socket {
     let (mut receiver, sender) = client.split().unwrap();
     thread::spawn(move || {
       for message in receiver.incoming_messages() {
-        println!("{:?}", message.unwrap())
+        let message = message.unwrap();
+        match message {
+          OwnedMessage::Text(msg) => {
+            tx.send(msg);
+          },
+          _ => {}
+        };
       }
     });
 

@@ -2,6 +2,8 @@ extern crate pancurses;
 
 use pancurses::{Window, Input, init_pair, noecho};
 use std::collections::VecDeque;
+use std::sync::mpsc::Receiver;
+use std::sync::mpsc::Sender;
 
 mod client;
 
@@ -276,7 +278,7 @@ impl<'t> ChatWindow<'t> {
         self.pending_msgs.push_back(gen_test_msg(message));
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self, rx: Receiver<String>, tx: Sender<String>) {
         // create loading screen
         self.window.clear();
         // set color pairs
@@ -285,7 +287,7 @@ impl<'t> ChatWindow<'t> {
         let (mut height, mut width) = self.window.get_max_yx();
 
         // connect socket
-        let mut socket = client::Socket::new();
+        let mut socket = client::Socket::new(tx);
 
         // draw screen
         self.window.clear();
@@ -314,6 +316,10 @@ impl<'t> ChatWindow<'t> {
         let mut x = INPUT_BOX_LEFT;
         self.window.mv(height - INPUT_BOX_HEIGHT, INPUT_BOX_LEFT);
         loop {
+            for msg in rx.try_iter() {
+                self.receive_message(&msg);
+            }
+
             // recalc self.window dimensions
             height = self.window.get_max_y();
             width = self.window.get_max_x();
@@ -328,6 +334,21 @@ impl<'t> ChatWindow<'t> {
                         })),
                     usr_snt: false
                 });
+                
+        // push up chat msgs accordingly
+        self.clr_box(1, height - INPUT_BOX_HEIGHT, INPUT_BOX_LEFT, width);
+        self.border();
+        let mut curr_y = height - INPUT_BOX_HEIGHT - 2;
+        // clear old stuff
+        self.window.color_set(PAIR_DEFAULT);
+        // draw every line of this message, moving upwards
+        let mut curr_x = INPUT_BOX_LEFT;
+        // write old messages
+        for msg in old_msgs.iter().rev() {
+            let new_coords = self.draw_msg(msg, curr_y, INPUT_BOX_LEFT);
+            curr_y = new_coords.0;
+            curr_x = new_coords.1;
+        }
             }
             // poll user input
             match self.window.getch() {
