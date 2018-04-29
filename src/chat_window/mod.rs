@@ -190,10 +190,10 @@ impl<'t> ChatWindow<'t> {
 
     fn border(&self) {
         self.window.color_set(PAIR_BORDER);
-        self.window.border('|', '|', ' ', '_', '/', '\\', '\\', '/');
+        // self.window.border('|', '|', ' ', '_', '/', '\\', '\\', '/');
 
-        self.window.mv(self.window.get_max_y() - INPUT_BOX_HEIGHT - 1, 0);
-        self.window.hline('-', self.window.get_max_x());
+        self.window.mv(self.window.get_max_y() - INPUT_BOX_HEIGHT - 1, INPUT_BOX_LEFT - 1);
+        self.window.hline('-', self.window.get_max_x() - 2);
     }
 
     /*
@@ -277,6 +277,20 @@ impl<'t> ChatWindow<'t> {
         self.pending_msgs.push_back(gen_test_msg(message));
     }
 
+    fn draw_old_msgs(&self, old_msgs: &Vec<DispMsg>) {
+        let (height, width) = self.window.get_max_yx();
+        // push up chat msgs accordingly
+        self.clr_box(1, height - INPUT_BOX_HEIGHT, INPUT_BOX_LEFT, width);
+        self.border();
+        let mut curr_y = height - INPUT_BOX_HEIGHT - 2;
+        // draw every line of this message, moving upwards
+        // write old messages
+        for msg in old_msgs.iter().rev() {
+            let new_coords = self.draw_msg(msg, curr_y, INPUT_BOX_LEFT);
+            curr_y = new_coords.0;
+        }
+    }
+
     pub fn run(&mut self, rx: Receiver<String>, tx: Sender<String>) {
         // create loading screen
         self.window.clear();
@@ -294,19 +308,7 @@ impl<'t> ChatWindow<'t> {
         self.window.color_set(PAIR_BORDER);
         // TODO load chat history
         let mut old_msgs = self.load_old_msgs();
-
-        // push up chat msgs accordingly
-        self.clr_box(1, height - INPUT_BOX_HEIGHT, INPUT_BOX_LEFT, width);
-	    self.border();
-        let mut curr_y = height - INPUT_BOX_HEIGHT - 2;
-        // draw every line of this message, moving upwards
-        let mut curr_x = INPUT_BOX_LEFT;
-        // write old messages
-        for msg in old_msgs.iter().rev() {
-            let new_coords = self.draw_msg(msg, curr_y, INPUT_BOX_LEFT);
-            curr_y = new_coords.0;
-            curr_x = new_coords.1;
-        }
+        self.draw_old_msgs(&old_msgs);
 
         let mut active_msg = String::new();
         let input_box_right: i32 = width - 1;
@@ -335,19 +337,7 @@ impl<'t> ChatWindow<'t> {
                         });
                     }
                 }
-                    
-                // push up chat msgs accordingly
-                self.clr_box(1, height - INPUT_BOX_HEIGHT, INPUT_BOX_LEFT, width);
-                self.border();
-                let mut curr_y = height - INPUT_BOX_HEIGHT - 2;
-                // draw every line of this message, moving upwards
-                let mut curr_x = INPUT_BOX_LEFT;
-                // write old messages
-                for msg in old_msgs.iter().rev() {
-                    let new_coords = self.draw_msg(msg, curr_y, INPUT_BOX_LEFT);
-                    curr_y = new_coords.0;
-                    curr_x = new_coords.1;
-                }
+                self.draw_old_msgs(&old_msgs);
             }
 
             // print user input under box
@@ -388,15 +378,7 @@ impl<'t> ChatWindow<'t> {
                         old_msgs.push(self.send_msg(&mut socket, &active_msg));
                         self.clr_box(1, height - INPUT_BOX_HEIGHT, INPUT_BOX_LEFT, width);
                         self.border();
-                        let mut curr_y = height - INPUT_BOX_HEIGHT - 2;
-                        // draw every line of this message, moving upwards
-                        let mut curr_x = INPUT_BOX_LEFT;
-                        // write old messages
-                        for msg in old_msgs.iter().rev() {
-                            let new_coords = self.draw_msg(msg, curr_y, INPUT_BOX_LEFT);
-                            curr_y = new_coords.0;
-                            curr_x = new_coords.1;
-                        }
+                        self.draw_old_msgs(&old_msgs);
                         // possible memory leak in reassignment?
                         active_msg = String::new();
                         x = INPUT_BOX_LEFT;
