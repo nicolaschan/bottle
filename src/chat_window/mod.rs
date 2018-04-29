@@ -21,7 +21,7 @@ const PAIR_BORDER: color = 5;
 fn set_color_pairs() {
     init_pair(PAIR_OLD_RECEIVED, FG_DEFAULT, BG_RECEIVE_DEFAULT);
     init_pair(PAIR_DEFAULT, pancurses::COLOR_GREEN, BG_SCREEN_DEFAULT);
-    init_pair(PAIR_OLD_SENT, pancurses::COLOR_BLUE, BG_SEND_DEFAULT);
+    init_pair(PAIR_OLD_SENT, pancurses::COLOR_BLACK, BG_SEND_DEFAULT);
     init_pair(PAIR_TYPING, FG_DEFAULT, BG_SCREEN_DEFAULT);
     init_pair(PAIR_BORDER, pancurses::COLOR_RED, BG_SCREEN_DEFAULT);
 }
@@ -324,31 +324,35 @@ impl<'t> ChatWindow<'t> {
             height = self.window.get_max_y();
             width = self.window.get_max_x();
             // check for incoming messages
-            if let Some(m) = self.pending_msgs.pop_front() {
-                old_msgs.push(DispMsg {
-                    lines: self.wrap_str(self.max_msg_width(),
-                        &(if let Some(txt) = m.content.text {
-                            txt.clone()
-                        } else {
-                            "".to_string()
-                        })),
-                    usr_snt: false
-                });
-                
-        // push up chat msgs accordingly
-        self.clr_box(1, height - INPUT_BOX_HEIGHT, INPUT_BOX_LEFT, width);
-        self.border();
-        let mut curr_y = height - INPUT_BOX_HEIGHT - 2;
-        // clear old stuff
-        self.window.color_set(PAIR_DEFAULT);
-        // draw every line of this message, moving upwards
-        let mut curr_x = INPUT_BOX_LEFT;
-        // write old messages
-        for msg in old_msgs.iter().rev() {
-            let new_coords = self.draw_msg(msg, curr_y, INPUT_BOX_LEFT);
-            curr_y = new_coords.0;
-            curr_x = new_coords.1;
-        }
+            if !self.pending_msgs.is_empty() {
+                while !self.pending_msgs.is_empty() {
+                    if let Some(m) = self.pending_msgs.pop_front() {
+                        old_msgs.push(DispMsg {
+                            lines: self.wrap_str(self.max_msg_width(),
+                                &(if let Some(txt) = m.content.text {
+                                    txt.clone()
+                                } else {
+                                    "".to_string()
+                                })),
+                            usr_snt: false
+                        });
+                    }
+                }
+                    
+                // push up chat msgs accordingly
+                self.clr_box(1, height - INPUT_BOX_HEIGHT, INPUT_BOX_LEFT, width);
+                self.border();
+                let mut curr_y = height - INPUT_BOX_HEIGHT - 2;
+                // clear old stuff
+                self.window.color_set(PAIR_DEFAULT);
+                // draw every line of this message, moving upwards
+                let mut curr_x = INPUT_BOX_LEFT;
+                // write old messages
+                for msg in old_msgs.iter().rev() {
+                    let new_coords = self.draw_msg(msg, curr_y, INPUT_BOX_LEFT);
+                    curr_y = new_coords.0;
+                    curr_x = new_coords.1;
+                }
             }
             // poll user input
             match self.window.getch() {
@@ -379,15 +383,15 @@ impl<'t> ChatWindow<'t> {
                         x = INPUT_BOX_LEFT;
                     }
                 },
+                Some(Input::KeyBackspace) | Some(Input::Character('\x08'))
+                        | Some(Input::Character('\x7f')) => {
+                            if let Some(_) = active_msg.pop() {
+                                x -= 1;
+                            }
+                        }
                 Some(Input::Character(c)) => {
                     if c.is_control() {
                         match c {
-                            // backspaces
-                            '\x08' | '\x7f' => {
-                                if let Some(_) = active_msg.pop() {
-                                    x -= 1;
-                                }
-                            },
                             _ => ()
                         }
                     } else {
