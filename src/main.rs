@@ -18,10 +18,12 @@ fn main() {
     window.printw("BOTTLE ALPHA v0.1.0");
     window.keypad(true);
     window.mvaddstr(1, 0, "Press enter to go to the test chat mode thing");
+    pancurses::use_default_colors();
     window.refresh();
     match window.getch() {
       Some(Input::KeyF1) => {},
       Some(Input::KeyEnter) | Some(Input::Character('\n')) => {
+        window.nodelay(true);
         window.mv(window.get_max_y() / 2, window.get_max_x() / 2 - 5);
         window.printw("loading...");
         window.refresh();

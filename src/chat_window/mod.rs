@@ -7,7 +7,7 @@ use std::sync::mpsc::Sender;
 
 mod client;
 
-const FG_DEFAULT: color = pancurses::COLOR_WHITE;
+const FG_DEFAULT: color = -1;
 const BG_RECEIVE_DEFAULT: color = pancurses::COLOR_MAGENTA;
 const BG_SEND_DEFAULT: color = pancurses::COLOR_CYAN;
 const BG_SCREEN_DEFAULT: color = -1;
@@ -19,7 +19,7 @@ const PAIR_TYPING: color = 4;
 const PAIR_BORDER: color = 5;
 
 fn set_color_pairs() {
-    init_pair(PAIR_OLD_RECEIVED, FG_DEFAULT, BG_RECEIVE_DEFAULT);
+    init_pair(PAIR_OLD_RECEIVED, pancurses::COLOR_WHITE, BG_RECEIVE_DEFAULT);
     init_pair(PAIR_DEFAULT, pancurses::COLOR_GREEN, BG_SCREEN_DEFAULT);
     init_pair(PAIR_OLD_SENT, pancurses::COLOR_BLACK, BG_SEND_DEFAULT);
     init_pair(PAIR_TYPING, FG_DEFAULT, BG_SCREEN_DEFAULT);
@@ -349,6 +349,32 @@ impl<'t> ChatWindow<'t> {
                     curr_x = new_coords.1;
                 }
             }
+
+            // print user input under box
+            // (rerenders whole thing on every run)
+            let disp = self.wrap_str(input_box_right - INPUT_BOX_LEFT - 4, &active_msg);
+            self.clr_input_box();
+            // UNSAFE CAST
+            let mut y = height - INPUT_BOX_HEIGHT;
+            self.window.color_set(PAIR_TYPING);
+            'drawln: for ln in disp.iter().rev() {
+                x = INPUT_BOX_LEFT - 1;
+                self.window.mv(y, x);
+                for s in ln {
+                    if y < 0 {
+                        break 'drawln
+                    }
+                    self.window.addch(' ');
+                    self.window.printw(s);
+                    x += 1;
+                    // can't add usize to i32
+                    // UNSAFE CAST
+                    x += s.chars().count() as i32;
+                    self.window.mv(y, x);
+                }
+                y -= 1;
+            }
+
             // poll user input
             match self.window.getch() {
                 Some(Input::KeyDC) => {
@@ -393,30 +419,6 @@ impl<'t> ChatWindow<'t> {
                     }
                 },
                 _ => { continue; }
-            }
-            // print user input under box
-            // (rerenders whole thing on every run)
-            let disp = self.wrap_str(input_box_right - INPUT_BOX_LEFT - 4, &active_msg);
-            self.clr_input_box();
-            // UNSAFE CAST
-            let mut y = height - INPUT_BOX_HEIGHT;
-            self.window.color_set(PAIR_TYPING);
-            'drawln: for ln in disp.iter().rev() {
-                x = INPUT_BOX_LEFT - 1;
-                self.window.mv(y, x);
-                for s in ln {
-                    if y < 0 {
-                        break 'drawln
-                    }
-                    self.window.addch(' ');
-                    self.window.printw(s);
-                    x += 1;
-                    // can't add usize to i32
-                    // UNSAFE CAST
-                    x += s.chars().count() as i32;
-                    self.window.mv(y, x);
-                }
-                y -= 1;
             }
         }
     }
