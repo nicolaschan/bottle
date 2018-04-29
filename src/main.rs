@@ -13,18 +13,17 @@ fn main() {
 
   let window = initscr();
   start_color();
+  noecho();
   window.printw("BOTTLE ALPHA v0.0.1");
   window.keypad(true);
   window.mvaddstr(1, 0, "Press enter to go to the test chat mode thing");
   window.refresh();
-  noecho();
   loop {
     match window.getch() {
       Some(Input::KeyF1) => break,
       Some(Input::KeyEnter) => { chat_window::init(&window); },
-      Some(Input::Character(c)) => { window.addch(c); },
-      Some(input) => { window.addstr(&format!("{:?}", input)); },
-      None => ()
+      Some(Input::Character('\n')) => { chat_window::init(&window); }
+      _ => ()
     }
   }
   endwin();

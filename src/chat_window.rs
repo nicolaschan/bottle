@@ -1,6 +1,6 @@
 extern crate pancurses;
 
-use pancurses::{Window, Input, init_pair};
+use pancurses::{Window, Input, init_pair, noecho};
 
 
 struct Content {
@@ -179,106 +179,164 @@ fn border(window: &Window) {
 /*
  * Draws a message and then returns the coordinates of the cursor at the end
  */
-fn draw_msg(window: &Window, msg: &DispMsg, mut curr_y: i32, mut curr_x: i32) -> (i32, i32) {
+fn draw_msg(window: &Window, msg: &DispMsg, y0: i32, x0: i32) -> (i32, i32) {
     let lines = &msg.lines;
     let usr_snt = msg.usr_snt;
-    let x0 = curr_x;
+    let mut curr_x: i32;
+    let mut curr_y: i32 = y0;
     // TODO distinguish between r/l justify
+    let left_x = window.get_max_x() - 2;
     if usr_snt {
         window.color_set(PAIR_OLD_SENT);
+        curr_x = left_x;
     } else {
         window.color_set(PAIR_OLD_RECEIVED);
+        curr_x = x0;
     }
-    window.mv(curr_y, x0);
+    window.mv(curr_y, curr_x);
     for ln in lines.iter().rev() {
-        for s in ln {
-            if curr_y < 0 {
-                return (curr_y, curr_x);
+        // go backwards for right justify
+        if usr_snt {
+            for s in ln.iter().rev() {
+                if curr_y < 0 {
+                    return (curr_y, curr_x);
+                }
+                // UNSAFE CAST
+                let s_len = s.chars().count() as i32;
+                curr_x -= (1 + s_len);
+                window.mv(curr_y, curr_x);
+                window.addch(' ');
+                window.mv(curr_y, curr_x + 1);
+                window.printw(s);
+                window.mv(curr_y, curr_x);
             }
-            window.printw(s);
-            window.addch(' ');
-            curr_x += 1;
-            // can't add usize to i32
-            // UNSAFE CAST
-            curr_x += s.chars().count() as i32;
-            window.mv(curr_y, curr_x);
+        } else {
+            for s in ln {
+                if curr_y < 0 {
+                    return (curr_y, curr_x);
+                }
+                // UNSAFE CAST
+                let s_len = s.chars().count() as i32;
+                window.printw(s);
+                window.addch(' ');
+                curr_x += 1 + s_len;
+                window.mv(curr_y, curr_x);
+            }
         }
         curr_y -= 1;
-        curr_x = x0;
+        if usr_snt {
+            curr_x = left_x;
+        } else {
+            curr_x = x0;
+        }
         window.mv(curr_y, x0);
     }
     curr_y -= 1;
     return (curr_y, curr_x)
 }
 
-fn clr_in_box(window: &Window) {
+/*
+ * Clears a box of these dimensions, including the firstbounds
+ * and excluding the last ones.
+ */
+fn clr_box(window: &Window, y0: i32, yf: i32, x0: i32, xf: i32) {
     window.color_set(PAIR_DEFAULT);
-    window.mv(window.get_max_y() - INPUT_BOX_HEIGHT + 1, INPUT_BOX_LEFT);
-    window.hline(' ', window.get_max_x() - 3);
+    let w = xf - x0;
+    for y in y0..yf {
+        window.mv(y, x0);
+        window.hline(' ', w);
+    }
+}
+
+fn clr_input_box(window: &Window) {
+    window.color_set(PAIR_DEFAULT);
+    let ht = window.get_max_y();
+    clr_box(window, ht - INPUT_BOX_HEIGHT, ht, INPUT_BOX_LEFT, window.get_max_x() - 1);
 }
 
 pub fn init(window: &Window) {
     window.clear();
-    let height = window.get_max_y();
-    let width = window.get_max_x();
+    let (mut height, mut width) = window.get_max_yx();
     // set color pairs
     set_color_pairs();
+    noecho();
     // box for user input
     window.color_set(PAIR_BORDER);
     // TODO load chat history
     let mut old_msgs = load_old_msgs(&window);
     // push up chat msgs accordingly
-    let update_old_msgs_view = |msgs: &Vec<DispMsg>| {
+    let update_old_msgs_view = |msgs: &Vec<DispMsg>, h: i32, w: i32| {
+        clr_box(window, 1, h - INPUT_BOX_HEIGHT, INPUT_BOX_LEFT, w);
 	    border(&window);
-        let mut curr_y = height - INPUT_BOX_HEIGHT - 2;
+        let mut curr_y = h - INPUT_BOX_HEIGHT - 2;
         // clear old stuff
         window.color_set(PAIR_DEFAULT);
-        for y in 1..curr_y {
-        	window.mv(y, INPUT_BOX_LEFT);
-            window.hline(' ', width - 3);
-        }
         // draw every line of this message, moving upwards
         let mut curr_x = INPUT_BOX_LEFT;
         // write old messages
         for msg in msgs.iter().rev() {
-            let new_coords = draw_msg(window, msg, curr_y, curr_x);
+            let new_coords = draw_msg(window, msg, curr_y, INPUT_BOX_LEFT);
             curr_y = new_coords.0;
             curr_x = new_coords.1;
         }
     };
-    update_old_msgs_view(&old_msgs);
+    update_old_msgs_view(&old_msgs, height, width);
     let mut active_msg = String::new();
     let input_box_right: i32 = width - 1;
     let mut x = INPUT_BOX_LEFT;
+    window.mv(height - INPUT_BOX_HEIGHT, INPUT_BOX_LEFT);
     loop {
-        // small time delay
-
+        // recalc window dimensions
+        height = window.get_max_y();
+        width = window.get_max_x();
         // TODO check for incoming messages
         // poll user input
         match window.getch() {
-            Some(Input::KeyEnter) => {
-                old_msgs.push(send_msg(&window, &active_msg));
-                update_old_msgs_view(&old_msgs);
-                // possible memory leak in reassignment?
-                active_msg = String::new();
-                x = INPUT_BOX_LEFT;
+            Some(Input::KeyDC) => {
+                if let Some(_) = active_msg.pop() {
+                    x -= 1;
+                }
             },
-            Some(Input::KeyBackspace) => {
-            	if let Some(_) = active_msg.pop() {
-            		x -= 1;
-            	}
+            Some(Input::KeyEnter) => {
+                if active_msg.chars().count() > 0 {
+                    old_msgs.push(send_msg(&window, &active_msg));
+                    update_old_msgs_view(&old_msgs, height, width);
+                    // possible memory leak in reassignment?
+                    active_msg = String::new();
+                    x = INPUT_BOX_LEFT;
+                }
             },
             Some(Input::Character(c)) => {
-                active_msg.push(c);
-                x += 1;
+                if c.is_control() {
+                    match c {
+                        '\n' | '\r' => {
+                            if active_msg.chars().count() > 0 {
+                                old_msgs.push(send_msg(&window, &active_msg));
+                                update_old_msgs_view(&old_msgs, height, width);
+                                // possible memory leak in reassignment?
+                                active_msg = String::new();
+                                x = INPUT_BOX_LEFT;
+                            }
+                        },
+                        // backspaces
+                        '\x08' | '\x7f' => {
+                            if let Some(_) = active_msg.pop() {
+                                x -= 1;
+                            }
+                        },
+                        _ => ()
+                    }
+                } else {
+                    active_msg.push(c);
+                    x += 1;
+                }
             },
-            Some(_) => { continue; },
-            None => { continue; }
+            _ => { continue; }
         }
         // print user input under box
         // (rerenders whole thing on every run)
-        let disp = wrap_str(5/*input_box_right - INPUT_BOX_LEFT - 4*/, &active_msg);
-        clr_in_box(window);
+        let disp = wrap_str(input_box_right - INPUT_BOX_LEFT - 4, &active_msg);
+        clr_input_box(window);
         // UNSAFE CAST
         let mut y = height - INPUT_BOX_HEIGHT;
         window.color_set(PAIR_TYPING);
