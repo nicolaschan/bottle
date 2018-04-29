@@ -9,7 +9,7 @@ Dependencies:
 
 ```bash
 # For Ubuntu
-sudo apt install libncursesw5-dev
+$ sudo apt install libncursesw5-dev
 ```
 
 ```bash
