@@ -10,7 +10,7 @@ mod client;
 const FG_DEFAULT: color = pancurses::COLOR_WHITE;
 const BG_RECEIVE_DEFAULT: color = pancurses::COLOR_MAGENTA;
 const BG_SEND_DEFAULT: color = pancurses::COLOR_CYAN;
-const BG_SCREEN_DEFAULT: color = pancurses::COLOR_BLACK;
+const BG_SCREEN_DEFAULT: color = -1;
 
 const PAIR_OLD_RECEIVED: color = 1;
 const PAIR_DEFAULT: color = 2;
@@ -269,7 +269,6 @@ impl<'t> ChatWindow<'t> {
     }
 
     fn clr_input_box(&self) {
-        self.window.color_set(PAIR_DEFAULT);
         let ht = self.window.get_max_y();
         self.clr_box(ht - INPUT_BOX_HEIGHT, ht, INPUT_BOX_LEFT, self.window.get_max_x() - 1);
     }
@@ -300,8 +299,6 @@ impl<'t> ChatWindow<'t> {
         self.clr_box(1, height - INPUT_BOX_HEIGHT, INPUT_BOX_LEFT, width);
 	    self.border();
         let mut curr_y = height - INPUT_BOX_HEIGHT - 2;
-        // clear old stuff
-        self.window.color_set(PAIR_DEFAULT);
         // draw every line of this message, moving upwards
         let mut curr_x = INPUT_BOX_LEFT;
         // write old messages
@@ -343,8 +340,6 @@ impl<'t> ChatWindow<'t> {
                 self.clr_box(1, height - INPUT_BOX_HEIGHT, INPUT_BOX_LEFT, width);
                 self.border();
                 let mut curr_y = height - INPUT_BOX_HEIGHT - 2;
-                // clear old stuff
-                self.window.color_set(PAIR_DEFAULT);
                 // draw every line of this message, moving upwards
                 let mut curr_x = INPUT_BOX_LEFT;
                 // write old messages
@@ -368,8 +363,6 @@ impl<'t> ChatWindow<'t> {
                         self.clr_box(1, height - INPUT_BOX_HEIGHT, INPUT_BOX_LEFT, width);
                         self.border();
                         let mut curr_y = height - INPUT_BOX_HEIGHT - 2;
-                        // clear old stuff
-                        self.window.color_set(PAIR_DEFAULT);
                         // draw every line of this message, moving upwards
                         let mut curr_x = INPUT_BOX_LEFT;
                         // write old messages
