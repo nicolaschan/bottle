@@ -190,7 +190,7 @@ impl<'t> ChatWindow<'t> {
 
     fn border(&self) {
         self.window.color_set(PAIR_BORDER);
-        self.window.border('|', '|', ' ', '_', '/', '\\', '\\', '/');
+        // self.window.border('|', '|', ' ', '_', '/', '\\', '\\', '/');
 
         self.window.mv(self.window.get_max_y() - INPUT_BOX_HEIGHT - 1, 0);
         self.window.hline('-', self.window.get_max_x());
