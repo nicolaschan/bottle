@@ -1,5 +1,6 @@
 extern crate pancurses;
 extern crate websocket;
+extern crate tokio;
 
 use pancurses::{initscr, endwin, Input, noecho};
 mod chat_window;
