@@ -1,0 +1,10 @@
+{
+  "name": "bottle-server",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Nicolas Chan <nicolas@nicolaschan.com>",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^5.1.1"
+  }
+}

@@ -11,3 +11,5 @@ Cargo.lock
 
 /target
 **/*.rs.bk
+
+bottle-server/node_modules/*
