@@ -1,9 +1,10 @@
 extern crate pancurses;
 
-use pancurses::{Window, Input, init_pair, noecho};
+use pancurses::{init_pair, noecho, Input, Window};
 use std::collections::VecDeque;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
+use std::sync::Arc;
 
 mod client;
 
@@ -19,7 +20,11 @@ const PAIR_TYPING: color = 4;
 const PAIR_BORDER: color = 5;
 
 fn set_color_pairs() {
-    init_pair(PAIR_OLD_RECEIVED, pancurses::COLOR_WHITE, BG_RECEIVE_DEFAULT);
+    init_pair(
+        PAIR_OLD_RECEIVED,
+        pancurses::COLOR_WHITE,
+        BG_RECEIVE_DEFAULT,
+    );
     init_pair(PAIR_DEFAULT, pancurses::COLOR_GREEN, BG_SCREEN_DEFAULT);
     init_pair(PAIR_OLD_SENT, pancurses::COLOR_BLACK, BG_SEND_DEFAULT);
     init_pair(PAIR_TYPING, FG_DEFAULT, BG_SCREEN_DEFAULT);
@@ -31,7 +36,7 @@ const INPUT_BOX_LEFT: i32 = 2;
 
 struct Content {
     text: Option<String>,
-    url: Option<String>
+    url: Option<String>,
 }
 
 struct Message {
@@ -39,7 +44,7 @@ struct Message {
     to: String,
     from: String,
     timestamp: String,
-    content: Content
+    content: Content,
 }
 
 fn gen_test_msg(s: &str) -> Message {
@@ -50,30 +55,29 @@ fn gen_test_msg(s: &str) -> Message {
         timestamp: "000".to_string(),
         content: Content {
             text: Some(s.to_string()),
-            url: None
-        }
+            url: None,
+        },
     }
 }
 
 pub struct ChatWindow<'w> {
     pending_msgs: VecDeque<Message>,
-    window: &'w Window
+    window: &'w Window,
 }
 
 struct DispMsg {
     lines: MsgLines,
-    usr_snt: bool
+    usr_snt: bool,
 }
 
 type color = i16;
 type MsgLines = Vec<Vec<String>>;
 
 impl<'t> ChatWindow<'t> {
-
     pub fn new<'a>(window: &'a Window) -> ChatWindow<'a> {
         ChatWindow {
             pending_msgs: VecDeque::new(),
-            window
+            window,
         }
     }
 
@@ -110,10 +114,13 @@ impl<'t> ChatWindow<'t> {
         // old_msgs.push(gen_test_msg("ha"));
         // old_msgs.push(gen_test_msg("hello"));
         // old_msgs.push(gen_test_msg("pls stop ignoring my texts"));
-        return old_msgs.iter().map(|s| DispMsg {
-            lines: self.get_msg_str(s),
-            usr_snt: false
-        }).collect();
+        return old_msgs
+            .iter()
+            .map(|s| DispMsg {
+                lines: self.get_msg_str(s),
+                usr_snt: false,
+            })
+            .collect();
     }
 
     fn max_msg_width(&self) -> i32 {
@@ -181,10 +188,10 @@ impl<'t> ChatWindow<'t> {
                 timestamp: "000".to_string(),
                 content: Content {
                     text: Some(txt.to_string()),
-                    url: None
-                }
+                    url: None,
+                },
             }),
-            usr_snt: true
+            usr_snt: true,
         }
     }
 
@@ -192,7 +199,10 @@ impl<'t> ChatWindow<'t> {
         self.window.color_set(PAIR_BORDER);
         // self.window.border('|', '|', ' ', '_', '/', '\\', '\\', '/');
 
-        self.window.mv(self.window.get_max_y() - INPUT_BOX_HEIGHT - 1, INPUT_BOX_LEFT - 1);
+        self.window.mv(
+            self.window.get_max_y() - INPUT_BOX_HEIGHT - 1,
+            INPUT_BOX_LEFT - 1,
+        );
         self.window.hline('-', self.window.get_max_x() - 2);
     }
 
@@ -223,7 +233,7 @@ impl<'t> ChatWindow<'t> {
                     }
                     // UNSAFE CAST
                     let s_len = s.chars().count() as i32;
-                    curr_x -= (1 + s_len);
+                    curr_x -= 1 + s_len;
                     self.window.mv(curr_y, curr_x);
                     self.window.addch(' ');
                     self.window.mv(curr_y, curr_x + 1);
@@ -252,7 +262,7 @@ impl<'t> ChatWindow<'t> {
             self.window.mv(curr_y, x0);
         }
         curr_y -= 1;
-        return (curr_y, curr_x)
+        return (curr_y, curr_x);
     }
 
     /*
@@ -270,7 +280,12 @@ impl<'t> ChatWindow<'t> {
 
     fn clr_input_box(&self) {
         let ht = self.window.get_max_y();
-        self.clr_box(ht - INPUT_BOX_HEIGHT, ht, INPUT_BOX_LEFT, self.window.get_max_x() - 1);
+        self.clr_box(
+            ht - INPUT_BOX_HEIGHT,
+            ht,
+            INPUT_BOX_LEFT,
+            self.window.get_max_x() - 1,
+        );
     }
 
     pub fn receive_message(&mut self, message: &str) {
@@ -314,6 +329,7 @@ impl<'t> ChatWindow<'t> {
         let input_box_right: i32 = width - 1;
         let mut x = INPUT_BOX_LEFT;
         self.window.mv(height - INPUT_BOX_HEIGHT, INPUT_BOX_LEFT);
+
         loop {
             for msg in rx.try_iter() {
                 self.receive_message(&msg);
@@ -322,48 +338,25 @@ impl<'t> ChatWindow<'t> {
             // recalc self.window dimensions
             height = self.window.get_max_y();
             width = self.window.get_max_x();
+
             // check for incoming messages
-            if !self.pending_msgs.is_empty() {
-                while !self.pending_msgs.is_empty() {
-                    if let Some(m) = self.pending_msgs.pop_front() {
-                        old_msgs.push(DispMsg {
-                            lines: self.wrap_str(self.max_msg_width(),
-                                &(if let Some(txt) = m.content.text {
-                                    txt.clone()
-                                } else {
-                                    "".to_string()
-                                })),
-                            usr_snt: false
-                        });
-                    }
-                }
-                self.draw_old_msgs(&old_msgs);
+            while let Some(m) = self.pending_msgs.pop_front() {
+                old_msgs.push(DispMsg {
+                    lines: self.wrap_str(
+                        self.max_msg_width(),
+                        &(if let Some(txt) = m.content.text {
+                            txt.clone()
+                        } else {
+                            "".to_string()
+                        }),
+                    ),
+                    usr_snt: false,
+                });
             }
 
-            // print user input under box
-            // (rerenders whole thing on every run)
-            let disp = self.wrap_str(input_box_right - INPUT_BOX_LEFT - 4, &active_msg);
-            self.clr_input_box();
-            // UNSAFE CAST
-            let mut y = height - INPUT_BOX_HEIGHT;
-            self.window.color_set(PAIR_TYPING);
-            'drawln: for ln in disp.iter().rev() {
-                x = INPUT_BOX_LEFT - 1;
-                self.window.mv(y, x);
-                for s in ln {
-                    if y < 0 {
-                        break 'drawln
-                    }
-                    self.window.addch(' ');
-                    self.window.printw(s);
-                    x += 1;
-                    // can't add usize to i32
-                    // UNSAFE CAST
-                    x += s.chars().count() as i32;
-                    self.window.mv(y, x);
-                }
-                y -= 1;
-            }
+            self.draw_old_msgs(&old_msgs);
+
+            let mut active_msg_updated = true;
 
             // poll user input
             match self.window.getch() {
@@ -371,9 +364,10 @@ impl<'t> ChatWindow<'t> {
                     if let Some(_) = active_msg.pop() {
                         x -= 1;
                     }
-                },
-                Some(Input::KeyEnter) | Some(Input::Character('\n'))
-                        | Some (Input::Character('\r')) => {
+                }
+                Some(Input::KeyEnter)
+                | Some(Input::Character('\n'))
+                | Some(Input::Character('\r')) => {
                     if active_msg.chars().count() > 0 {
                         old_msgs.push(self.send_msg(&mut socket, &active_msg));
                         self.clr_box(1, height - INPUT_BOX_HEIGHT, INPUT_BOX_LEFT, width);
@@ -383,25 +377,57 @@ impl<'t> ChatWindow<'t> {
                         active_msg = String::new();
                         x = INPUT_BOX_LEFT;
                     }
-                },
-                Some(Input::KeyBackspace) | Some(Input::Character('\x08'))
-                        | Some(Input::Character('\x7f')) => {
-                            if let Some(_) = active_msg.pop() {
-                                x -= 1;
-                            }
-                        }
+                }
+                Some(Input::KeyBackspace)
+                | Some(Input::Character('\x08'))
+                | Some(Input::Character('\x7f')) => {
+                    if let Some(_) = active_msg.pop() {
+                        x -= 1;
+                    }
+                }
                 Some(Input::Character(c)) => {
                     if c.is_control() {
                         match c {
-                            _ => ()
+                            _ => (),
                         }
                     } else {
                         active_msg.push(c);
                         x += 1;
                     }
-                },
-                _ => { continue; }
+                }
+                _ => {
+                    active_msg_updated = false;
+                    continue;
+                }
             }
-        }
+
+            if active_msg_updated {
+                // print user input under box
+                let disp = self.wrap_str(input_box_right - INPUT_BOX_LEFT - 4, &active_msg);
+                self.clr_input_box();
+                // UNSAFE CAST
+                let mut y = height - INPUT_BOX_HEIGHT;
+                self.window.color_set(PAIR_TYPING);
+                'drawln: for ln in disp.iter().rev() {
+                    x = INPUT_BOX_LEFT - 1;
+                    self.window.mv(y, x);
+                    for s in ln {
+                        if y < 0 {
+                            break 'drawln;
+                        }
+                        self.window.addch(' ');
+                        self.window.printw(s);
+                        x += 1;
+                        // can't add usize to i32
+                        // UNSAFE CAST
+                        x += s.chars().count() as i32;
+                        self.window.mv(y, x);
+                    }
+                    y -= 1;
+                }
+            }
+
+
+        } // end event loop
     }
 }
