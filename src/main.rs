@@ -1,6 +1,9 @@
 extern crate pancurses;
 extern crate websocket;
 
+#[macro_use]
+extern crate serde;
+
 use std::sync::mpsc::channel;
 
 use pancurses::{endwin, initscr, noecho, start_color, Input};
