@@ -11,6 +11,9 @@ Dependencies:
 - ncursesw
 
 ```bash
+# For FreeBSD
+$ sudo pkg install ncurses
+
 # For Ubuntu
 $ sudo apt install libncursesw5-dev
 ```
