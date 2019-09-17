@@ -3,6 +3,7 @@ extern crate pancurses;
 
 use chat_window::chrono::prelude::{DateTime, Local};
 use pancurses::{init_pair, noecho, Input, Window};
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::Sender;
@@ -35,17 +36,20 @@ fn set_color_pairs() {
 const INPUT_BOX_HEIGHT: i32 = 6;
 const INPUT_BOX_LEFT: i32 = 2;
 
+#[derive(Serialize, Deserialize)]
 enum MsgType {
     Text,
     Image,
 }
 
+#[derive(Serialize, Deserialize)]
 struct MsgMetaData {
     to: String,
     from: String,
     timestamp: DateTime<Local>,
 }
 
+#[derive(Serialize, Deserialize)]
 enum Message {
     Raw {
         meta_data: MsgMetaData,
@@ -60,18 +64,6 @@ enum Message {
         meta_data: MsgMetaData,
         url: String,
     },
-}
-
-fn gen_test_msg(s: &str) -> Message {
-    Message::Raw {
-        meta_data: MsgMetaData {
-            to: "me".to_string(),
-            from: "me".to_string(),
-            timestamp: Local::now(),
-        },
-        msg_type: MsgType::Text,
-        text: s.to_string(),
-    }
 }
 
 pub struct ChatWindow<'w> {
@@ -90,25 +82,9 @@ impl<'t> ChatWindow<'t> {
         }
     }
 
-    /*
-     * Processes incoming messages and moves up old messages accordingly.
-     */
-    fn process_incoming_msg(&self) -> Option<String> {
-        Some("test".to_string())
-    }
-
     fn load_old_msgs(&self) -> Vec<Message> {
-        let mut old_msgs: Vec<Message> = Vec::new();
+        let old_msgs: Vec<Message> = Vec::new();
         old_msgs
-        /*
-        return old_msgs
-            .iter()
-            .map(|s| DispMsg {
-                lines: self.get_msg_str(s),
-                usr_snt: false,
-            })
-            .collect();
-        */
     }
 
     fn max_msg_width(&self) -> i32 {
@@ -158,8 +134,18 @@ impl<'t> ChatWindow<'t> {
     }
 
     fn send_msg(&self, socket: &mut client::Socket, txt: &String) -> Message {
-        // should actually be sending a serialized raw message
-        socket.send_message(txt.as_str());
+        let msg = Message::Raw {
+            meta_data: MsgMetaData {
+                to: "you".to_string(),
+                from: "me".to_string(),
+                timestamp: Local::now(),
+            },
+            msg_type: MsgType::Text,
+            text: txt.to_string(),
+        };
+
+        socket.send_message(bincode::serialize(&msg).unwrap());
+
         Message::Text {
             meta_data: MsgMetaData {
                 to: "you".to_string(),
@@ -281,10 +267,6 @@ impl<'t> ChatWindow<'t> {
         );
     }
 
-    pub fn receive_message(&mut self, message: &str) {
-        self.pending_msgs.push_back(gen_test_msg(message));
-    }
-
     fn draw_old_msgs(&self, old_msgs: &Vec<Message>) {
         let (height, width) = self.window.get_max_yx();
         // push up chat msgs accordingly
@@ -299,7 +281,7 @@ impl<'t> ChatWindow<'t> {
         }
     }
 
-    pub fn run(&mut self, rx: Receiver<String>, tx: Sender<String>) {
+    pub fn run(&mut self, rx: Receiver<Vec<u8>>, tx: Sender<Vec<u8>>) {
         // create loading screen
         self.window.clear();
         // set color pairs
@@ -325,7 +307,8 @@ impl<'t> ChatWindow<'t> {
 
         loop {
             for msg in rx.try_iter() {
-                self.receive_message(&msg);
+                self.pending_msgs
+                    .push_back(bincode::deserialize(&msg).unwrap())
             }
 
             // recalc self.window dimensions

@@ -6,7 +6,9 @@ authors = ["Nicolas Chan <nicolas@nicolaschan.com>"]
 [dependencies]
 websocket = "0.20.2"
 tokio = "0.1.5"
-chrono = "0.4.9"
+chrono = { version = "0.4.9", features = ["serde"] }
+serde = { version = "1.0.101", features = ["derive"] }
+bincode = "1.1.4"
 
 [dependencies.pancurses]
 version = "0.16"
