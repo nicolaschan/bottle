@@ -2,8 +2,6 @@ extern crate pancurses;
 extern crate websocket;
 
 use std::sync::mpsc::channel;
-use std::sync::Arc;
-use std::thread;
 
 use pancurses::{endwin, initscr, noecho, start_color, Input};
 mod chat_window;
